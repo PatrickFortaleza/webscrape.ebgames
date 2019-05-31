@@ -1,14 +1,60 @@
 import bs4
+import time
 from urllib.request import urlopen as uReq
 from bs4 import BeautifulSoup as soup
+from selenium import webdriver
 
-my_url = 'https://www.ebgames.ca/SearchResult/QuickSearch?strokenPrice=Recent%20Drop&typeSorting=4&sDirection=Descending#group21'
-uClient = uReq(my_url)
-page_html = uClient.read()
-uClient.close()
+
+my_url = 'https://www.ebgames.ca/SearchResult/QuickSearch?strokenPrice=Recent%20Drop&typeSorting=4&sDirection=Descending#group31'
+# uClient = uReq(my_url)
+# page_html = uClient.read()
+# uClient.close()
+browser = webdriver.Chrome()
+browser.get(my_url)
+
+
+last_height = browser.execute_script("return document.body.scrollHeight")
+SCROLL_PAUSE_TIME = 0.5
+
+while True:
+
+    # Get scroll height
+    ### This is the difference. Moving this *inside* the loop
+    ### means that it checks if scrollTo is still scrolling 
+    last_height = browser.execute_script("return document.body.scrollHeight")
+
+    # Scroll down to bottom
+    browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+
+    # Wait to load page
+    time.sleep(SCROLL_PAUSE_TIME)
+
+    # Calculate new scroll height and compare with last scroll height
+    new_height = browser.execute_script("return document.body.scrollHeight")
+    if new_height == last_height:
+
+        # try again (can be removed)
+        browser.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+
+        # Wait to load page
+        time.sleep(SCROLL_PAUSE_TIME)
+
+        # Calculate new scroll height and compare with last scroll height
+        new_height = browser.execute_script("return document.body.scrollHeight")
+
+        # check if the page height has remained the same
+        if new_height == last_height:
+            # if so, you are done
+            break
+        # if not, move on to the next loop
+        else:
+            last_height = new_height
+            continue
+
+innerHTML = browser.execute_script("window.scrollTo(0, document.body.scrollHeight-10000);var lenOfPage=document.body.scrollHeight;return document.body.innerHTML;")
 
 # Parse HTML
-page_soup = soup(page_html,"html.parser")
+page_soup = soup(innerHTML,"html.parser")
 
 filename = "games.csv"
 f = open(filename,"w")
@@ -31,23 +77,33 @@ for container in containers:
     game_console = game_console.split(' ')[0]
 
     #Grab the discount price
-    price_container = container.find("p", {'class': 'buyNew'}).a.span.text
-    price_container = price_container.strip().split('\n')[1]
-    price_container = float(price_container.replace('$',''))
+    try:
+        price_container = container.find("p", {'class': 'buyNew'}).a.span.text
+        price_container = price_container.strip().split('\n')[1]
+        price_container = float(price_container.replace('$',''))
+    except Exception as e:
+        price_container = container.find("p", {'class': 'buyUsed'}).a.span.text
+        price_container = price_container.strip().split('\n')[1]
+        price_container = float(price_container.replace('$',''))
 
     #Grab the retail price
-    price_container2 = container.find("p", {'class': 'buyNew'}).a.span.text
-    price_container2 = price_container2.strip().split('\n')[2]
-    price_container2 = float(price_container2.replace('$',''))
+    try: 
+        price_container2 = container.find("p", {'class': 'buyNew'}).a.span.text
+        price_container2 = price_container2.strip().split('\n')[2]
+        price_container2 = float(price_container2.replace('$',''))
+    except Exception as e:
+        price_container2 = price_container
 
     #Grab the release date
     release_date = container.div.ul.li.text
     release_date = release_date.split(' ')[2]
 
     #Rate the deal status
-    the_discount = 3 #((price_container2 - price_container)/price_container2)*100
+    the_discount = ((price_container2 - price_container)/price_container2)*100
 
-    if the_discount <= 10:
+    if the_discount == 0:
+        deal_status = 'Used Game'
+    elif the_discount <= 10:
         deal_status = 'Average Discount'
     elif the_discount > 10 and the_discount < 25:
         deal_status = 'Decent Discount'
