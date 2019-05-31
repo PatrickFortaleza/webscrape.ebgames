@@ -125,3 +125,4 @@ for container in containers:
     f.write(game_title + "," + game_console + "," + str(price_container) + "," + str(price_container2) + "," + release_date + "," + deal_status + "\n")
 
 f.close()
+driver.quit()
